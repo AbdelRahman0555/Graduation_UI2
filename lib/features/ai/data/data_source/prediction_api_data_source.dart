@@ -1,0 +1,98 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:injectable/injectable.dart';
+import '../../../../core/api/api_endpoints.dart';
+import '../../../../core/error/api_error_handler.dart';
+import '../model/prediction_response.dart';
+import '../model/health_data_model.dart';
+import '../model/text_prediction_response.dart';
+import 'prediction_remote_data_source.dart';
+
+@LazySingleton(as: PredictionRemoteDataSource)
+class PredictionApiDataSource implements PredictionRemoteDataSource {
+  final Dio _mainDio;
+  final Dio _predictDio;
+  final Dio _anemiaDio;
+  final Dio _anemiaSurveyDio;
+  final Dio _textPredictDio;
+
+  PredictionApiDataSource(
+    @Named('MainDio') this._mainDio,
+    @Named('PredictDio') this._predictDio,
+    @Named('AnemiaDio') this._anemiaDio,
+    @Named('AnemiaSurveyDio') this._anemiaSurveyDio,
+    @Named('TextPredictDio') this._textPredictDio,
+  );
+
+  @override
+  Future<PredictionResponse> predictImage(File imageFile) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(imageFile.path, filename: 'image.jpg'),
+      });
+
+      final response = await _mainDio.post(ApiEndpoints.diabetesPredict, data: formData);
+
+      return PredictionResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiErrorHandler.handleDioError(e);
+    }
+  }
+
+  @override
+  Future<PredictionResponse> predictHealthData(HealthDataModel healthData) async {
+    try {
+      final response = await _predictDio.post(
+        ApiEndpoints.diabetesPredict,
+        data: healthData.toJson(),
+      );
+      print(response.data);
+      return PredictionResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiErrorHandler.handleDioError(e);
+    }
+  }
+
+  @override
+  Future<PredictionResponse> predictAnemiaImage(File imageFile) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(imageFile.path, filename: 'image.jpg'),
+      });
+
+      final response = await _anemiaDio.post(ApiEndpoints.anemiaPredict, data: formData);
+      print('Anemia API Response: ${response.data}');
+
+      return PredictionResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiErrorHandler.handleDioError(e);
+    }
+  }
+
+  @override
+  Future<PredictionResponse> predictAnemiaSurvey(Map<String, dynamic> surveyData) async {
+    try {
+      final response = await _anemiaSurveyDio.post(
+        ApiEndpoints.anemiaSurveyPredict,
+        data: surveyData,
+      );
+      print('Anemia Survey Response: ${response.data}');
+      return PredictionResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiErrorHandler.handleDioError(e);
+    }
+  }
+
+  @override
+  Future<TextPredictionResponse> predictFromText(String text) async {
+    try {
+      final response = await _textPredictDio.post(
+        ApiEndpoints.textPredict,
+        data: {'text': text},
+      );
+      return TextPredictionResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiErrorHandler.handleDioError(e);
+    }
+  }
+}
